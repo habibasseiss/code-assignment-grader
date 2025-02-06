@@ -73,7 +73,7 @@ export const ConfigSidebar: React.FC<ConfigSidebarProps> = ({
                     System Prompt
                   </label>
                   <textarea
-                    rows={4}
+                    rows={10}
                     value={config.systemPrompt}
                     onChange={(e) =>
                       onConfigChange({

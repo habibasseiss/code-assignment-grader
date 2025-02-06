@@ -1,5 +1,5 @@
-import { Code, FolderOpen } from "lucide-react";
-import React, { useCallback, useState } from "react";
+import { Code, FolderOpen, Trash2 } from "lucide-react";
+import React, { useCallback, useRef, useState } from "react";
 import { FileUpload } from "../types";
 
 interface FileDropzoneProps {
@@ -18,7 +18,26 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
   const [isDragging, setIsDragging] = useState(false);
 
   const handleFiles = useCallback(
-    async (items: DataTransferItemList) => {
+    async (items: DataTransferItemList | FileList) => {
+      const processFile = async (file: File): Promise<FileUpload> => {
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            resolve({
+              name: file.name,
+              content: e.target?.result as string,
+            });
+          };
+          reader.readAsText(file);
+        });
+      };
+
+      if (items instanceof FileList) {
+        const files = await Promise.all(Array.from(items).map(processFile));
+        onFilesAdded(files);
+        return;
+      }
+
       const entries = Array.from(items)
         .filter((item) => item.kind === "file")
         .map((item) => item.webkitGetAsEntry());
@@ -77,6 +96,20 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
     [handleFiles]
   );
 
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      handleFiles(e.target.files);
+      // Reset the input value so the same file can be selected again
+      e.target.value = "";
+    }
+  };
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleClick = () => {
+    fileInputRef.current?.click();
+  };
+
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(true);
@@ -98,15 +131,23 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
     <div>
       <h2 className="text-lg font-medium text-gray-900 mb-6">{title}</h2>
       <div
+        onClick={handleClick}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
-        className={`border-2 border-dashed rounded-lg transition-colors ${
+        className={`border-2 border-dashed rounded-lg transition-colors cursor-pointer ${
           isDragging
             ? "border-indigo-500 bg-indigo-50"
             : "border-gray-300 hover:border-indigo-400"
         }`}
       >
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileInputChange}
+          className="hidden"
+          multiple
+        />
         {files.length === 0 ? (
           <div className="text-center py-12">
             <FolderOpen className="mx-auto h-12 w-12 text-gray-400" />
@@ -130,10 +171,13 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
                     </span>
                   </div>
                   <button
-                    onClick={() => onFileRemove(file.name)}
-                    className="text-sm text-red-600 hover:text-red-800"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onFileRemove(file.name);
+                    }}
+                    className="text-sm p-1 text-gray-800 hover:text-red-800"
                   >
-                    Remove
+                    <Trash2 className="h-4 w-4" />
                   </button>
                 </li>
               ))}

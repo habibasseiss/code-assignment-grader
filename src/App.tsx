@@ -3,14 +3,12 @@ import { useEffect, useState } from "react";
 import { ConfigSidebar } from "./components/ConfigSidebar";
 import { FileDropzone } from "./components/FileDropzone";
 import { DEFAULT_SYSTEM_PROMPT, STORAGE_KEY } from "./constants";
+import { handleReview } from "./services/reviewService";
 import { Config, FileUpload, Provider } from "./types";
 
 function App() {
   const [templateFiles, setTemplateFiles] = useState<FileUpload[]>([]);
   const [studentFiles, setStudentFiles] = useState<FileUpload[]>([]);
-  const [activeTab, setActiveTab] = useState<"template" | "submission">(
-    "template"
-  );
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [config, setConfig] = useState<Config>(() => {
     const savedConfig = localStorage.getItem(STORAGE_KEY);
@@ -23,6 +21,8 @@ function App() {
       systemPrompt: DEFAULT_SYSTEM_PROMPT,
     };
   });
+  const [isLoading, setIsLoading] = useState(false);
+  const [feedback, setFeedback] = useState<string>("");
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
@@ -34,6 +34,40 @@ function App() {
 
   const handleStudentFilesAdded = (newFiles: FileUpload[]) => {
     setStudentFiles((prev) => [...prev, ...newFiles]);
+  };
+
+  const onReviewStart = async () => {
+    if (!config.apiKey) {
+      alert("Please set your API key in the settings");
+      return;
+    }
+
+    if (templateFiles.length === 0) {
+      alert("Please upload template files first");
+      return;
+    }
+
+    if (studentFiles.length === 0) {
+      alert("Please upload submission files");
+      return;
+    }
+
+    setIsLoading(true);
+    setFeedback("");
+
+    try {
+      const response = await handleReview(config, templateFiles, studentFiles);
+      setFeedback(response);
+    } catch (error) {
+      console.error("Error during review:", error);
+      setFeedback(
+        `Error: ${
+          error instanceof Error ? error.message : "Unknown error occurred"
+        }`
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -57,33 +91,9 @@ function App() {
 
       <main>
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-          <div className="mb-8">
-            <nav className="flex space-x-4" aria-label="Tabs">
-              <button
-                onClick={() => setActiveTab("template")}
-                className={`${
-                  activeTab === "template"
-                    ? "bg-indigo-100 text-indigo-700"
-                    : "text-gray-500 hover:text-gray-700"
-                } rounded-md px-3 py-2 text-sm font-medium`}
-              >
-                Template
-              </button>
-              <button
-                onClick={() => setActiveTab("submission")}
-                className={`${
-                  activeTab === "submission"
-                    ? "bg-indigo-100 text-indigo-700"
-                    : "text-gray-500 hover:text-gray-700"
-                } rounded-md px-3 py-2 text-sm font-medium`}
-              >
-                Submission
-              </button>
-            </nav>
-          </div>
-
-          <div className="space-y-8">
-            {activeTab === "template" ? (
+          <div className="grid grid-cols-2 gap-8">
+            <div className="space-y-4">
+              <h2 className="text-lg font-semibold text-gray-900">Template</h2>
               <FileDropzone
                 files={templateFiles}
                 isTemplate={true}
@@ -94,7 +104,12 @@ function App() {
                   )
                 }
               />
-            ) : (
+            </div>
+
+            <div className="space-y-4">
+              <h2 className="text-lg font-semibold text-gray-900">
+                Submission
+              </h2>
               <FileDropzone
                 files={studentFiles}
                 isTemplate={false}
@@ -105,8 +120,43 @@ function App() {
                   )
                 }
               />
-            )}
+
+              <div className="flex justify-end">
+                <button
+                  onClick={onReviewStart}
+                  disabled={isLoading || studentFiles.length === 0}
+                  className={`rounded-md px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm ${
+                    isLoading || studentFiles.length === 0
+                      ? "bg-indigo-400 cursor-not-allowed"
+                      : "bg-indigo-600 hover:bg-indigo-500"
+                  }`}
+                >
+                  {isLoading ? "Reviewing..." : "Start Review"}
+                </button>
+
+                <button
+                  disabled={isLoading || studentFiles.length === 0}
+                  onClick={() => {
+                    setStudentFiles([]);
+                    setFeedback("");
+                  }}
+                  className={`ml-2 inline-flex items-center rounded-md px-3 py-2 text-sm font-semibold shadow-sm ring-1 ring-inset ring-gray-300 ${
+                    isLoading || studentFiles.length === 0
+                      ? "cursor-not-allowed bg-gray-100 text-gray-500"
+                      : "hover:bg-gray-50 text-gray-900"
+                  }`}
+                >
+                  Clear Submission
+                </button>
+              </div>
+            </div>
           </div>
+
+          {feedback && (
+            <div className="mt-4 p-4 bg-white rounded-lg shadow">
+              <pre className="whitespace-pre-wrap">{feedback}</pre>
+            </div>
+          )}
         </div>
       </main>
 
