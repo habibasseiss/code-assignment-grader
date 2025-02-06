@@ -1,5 +1,6 @@
 import { Settings } from "lucide-react";
 import { useEffect, useState } from "react";
+import ReactMarkdown from "react-markdown";
 import { ConfigSidebar } from "./components/ConfigSidebar";
 import { FileDropzone } from "./components/FileDropzone";
 import { DEFAULT_SYSTEM_PROMPT, STORAGE_KEY } from "./constants";
@@ -56,8 +57,9 @@ function App() {
     setFeedback("");
 
     try {
-      const response = await handleReview(config, templateFiles, studentFiles);
-      setFeedback(response);
+      await handleReview(config, templateFiles, studentFiles, (chunk) => {
+        setFeedback((prev) => prev + chunk);
+      });
     } catch (error) {
       console.error("Error during review:", error);
       setFeedback(
@@ -76,7 +78,7 @@ function App() {
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
             <h1 className="text-3xl font-bold tracking-tight text-gray-900">
-              Code Reviewer
+              Code Assignment Grader
             </h1>
             <button
               onClick={() => setIsConfigOpen(true)}
@@ -153,8 +155,8 @@ function App() {
           </div>
 
           {feedback && (
-            <div className="mt-4 p-4 bg-white rounded-lg shadow">
-              <pre className="whitespace-pre-wrap">{feedback}</pre>
+            <div className="mt-4 p-4 bg-white rounded-lg shadow prose max-w-none">
+              <ReactMarkdown>{feedback}</ReactMarkdown>
             </div>
           )}
         </div>
